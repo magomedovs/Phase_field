@@ -73,7 +73,7 @@ function solve_eigen(phi, T, c::Float64, k::Float64, NUM::Int64)
     println("NUM = ", NUM)
     println("k = ", k)
 
-    number_of_eigenvals = 700
+    number_of_eigenvals = 300
     println("number_of_eigenvals = ", number_of_eigenvals)
 
     # Computing eigenvalues of the matrix Mat

@@ -60,7 +60,7 @@ const τ = 0.0003 * (ϵ_0*100)^2
 
 H1 = 5.0   # Domain_side_length
 M1 = 1001    # количество отрезков разбиения области вдоль оси x и y (можем выбирать)
-Time_Period1 = 0.02      # период наблюдения (можем выбирать)
+Time_Period1 = 0.01      # период наблюдения (можем выбирать)
 
 # Создаем структуру типа Discretization
 scheme = create_Discretization(scheme_type=Explicit(), domain_side_length=H1, mesh_number=M1, time=Time_Period1)
@@ -72,8 +72,8 @@ y = copy(x)
 # creating initial conditions matrices
 init_phi = ones(M1, M1)
 init_T = zeros(M1, M1)
-A = 0.0 #0.02     # amplitude
-k = 20.0      # wave number
+A = 0.02 #0.02     # amplitude
+k = 5.0      # wave number
 
 set_initial_phi!(init_phi, H1, M1; smoothness="continious", shape="band", band_height=0.5, amplitude=A, wave_number=k)
 set_initial_T!(init_T, H1, M1; smoothness="continious", band_height=0.5, amplitude=A, wave_number=k)
@@ -95,6 +95,7 @@ time_moments = []#[0.01; [i for i=0.05:0.05:scheme.time]] # [0.01, 0.05, 0.1, 0.
 
 # @time
 # Juno.@profiler
+# @profview 
 
 #phi, T, time_end = calculate(scheme, init_cond_matrices; time_moments_to_make_shots=time_moments, number_of_shots_per_time_moment=3, top_bc=Top_bc, bottom_bc=Bottom_bc, stop_function=my_stop_func)
 

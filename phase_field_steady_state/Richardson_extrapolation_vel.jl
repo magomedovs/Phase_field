@@ -54,8 +54,8 @@ sol = nlsolve(f!, [1.4]; ftol=1e-10)
 
 # Extrapolation
 
-inds = [1, 2, 3, 4]
-#inds = [1, 4, 7, 9]
+#inds = [1, 2, 3, 4]
+inds = [1, 4, 7, 9]
 #inds = [10, 11, 12, 13]
 
 h_list = [h_arr[i] for i in inds]
@@ -64,9 +64,9 @@ res_estim = extrapolate_c(h_list, c_list)
 
 
 # Curve fitting
-@. model(t, p) = p[1] + p[2] * t^2 + p[3] * t^4
+@. model(t, p) = p[1] + p[2] * t^2 + p[3] * t^4;
 p0 = res_estim[1:3]
-fit = curve_fit(model, h_arr[1:end], c_arr[1:end], p0)
+fit = curve_fit(model, h_arr[1:end], c_arr[1:end], p0, x_tol = 1e-12, show_trace=true);
 res = fit.param
 c_extrap = res[1]
 h2_coef = res[2]
@@ -91,6 +91,9 @@ plot!(range(findmin(h_arr)[1], findmax(h_arr)[1], length=Int(1e5)),
 
 #savefig("/Users/shamilmagomedov/Desktop/c_plot_S_" * "$S" * "_eps_" * "$ϵ_0" * ".pdf")
 
+cov = estimate_covar(fit)
+
+se = stderror(fit)
 
 #=
 plot(h_arr, c_arr,

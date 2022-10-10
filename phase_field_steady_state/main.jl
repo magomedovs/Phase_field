@@ -27,7 +27,7 @@ a_1 = 0.9 * (ϵ_0*100)
 m(T) = (a_1 / pi) * atan(β * (1 - T))
 m_prime(T) = -(a_1 * β / pi) * 1/(1 + (β * (1 - T))^2)
 
-M = length(ARGS) >= 3 ? parse(Int64, ARGS[3]) : 150001    # number of mesh points for Newton--Raphson. Must be odd number
+M = length(ARGS) >= 3 ? parse(Int64, ARGS[3]) : 10001    # number of mesh points for Newton--Raphson. Must be odd number
 Δh = H / (M - 1)
 
 α = (ϵ_0 / Δh)^2
@@ -86,7 +86,7 @@ write(io, "$Δh $c $c_sharp_lim $S $ϵ_0\n")
 close(io)
 =#
 
-
+#==
 
 # Calculation of eigenvalues of the linear system
 
@@ -98,8 +98,6 @@ T_itp = interpolate(T, BSpline(Cubic(Natural(OnGrid()))));
 T_sitp = scale(T_itp, x);
 
 NUM = 3001
-
-#==
 
 # ArnoldiMethod
 k_test = 1.0e1
@@ -113,7 +111,7 @@ plot(range(-H/2, H/2, length = NUM-2), [u, v], label=["u" "v"], xlabel="η", tit
 front_vel = c_sharp_lim
 
 C0 = u[div(NUM-2, 2) + 1] * 4 * sqrt(2)
-D2 = v[div(NUM-2, 2) + 1] / ϵ_0 # - sign(v[div(NUM-2, 2) + 1]) * ϵ_0 * front_vel  # ??? guessed parameter value
+D2 = v[div(NUM-2, 2) + 1] / ϵ_0 # - sign(v[div(NUM-2, 2) + 1]) * ϵ_0 * front_vel  # ??? guessed parameter value  # front_vel^2 / (2 * S * sqrt(4*(λs_test_max_re + k_test^2) + front_vel^2)) * C0
 
 B1 = D2 - C0 * front_vel / (2 * S)
 A1 = D2 + C0 * front_vel / (2 * S)
@@ -133,18 +131,21 @@ function v_composite(x)
     end
 end
 
-plot(range(-H/2, H/2, length = NUM-2), v, label="v", legend=:topleft)#, xlims=(-H/2, -1.), ylims=(-1e-5, 1e-5)) #, xlims=(-H/2, -0.2), ylims=(-0.005, 0.005)
-plot!(x, x->v_composite(x), style=:solid, label="v asymptotic solution,\n ϵ_0=$ϵ_0")
+plot(range(-H/2, H/2, length = NUM-2), v, label="v computed", legend=:topleft)#, xlims=(0.499, 0.5), ylims=(-1e-8, 1e-10)) #, xlims=(-H/2, -1.), ylims=(-1e-5, 1e-5)) #, xlims=(-H/2, -0.2), ylims=(-0.005, 0.005)
+plot!(x, x->v_composite(x), style=:solid, label="v asymptotic solution,\n ϵ_0=$ϵ_0")#, xlims=(-0.01, 0.01))#, ylims=(-1e-5, 1e-5))
+#savefig("/Users/shamilmagomedov/Desktop/plots_uv/v_computed_zoomed.pdf")
+#savefig("/Users/shamilmagomedov/Desktop/plots_uv/v_asympt.pdf")
 
 v_asympt(mu, some_const, x) = some_const * exp(mu * x)
 plot!(range(-H/2, 0, length = NUM-2), x->v_asympt(mu_left, ϵ_0 * A1, x), style = :dashdot, label="const * exp($(round(mu_left; digits=3))x)")
 plot!(range(0.05, H/2, length = NUM-2), x->v_asympt(mu_right, ϵ_0 * B1, x), style = :dashdot, label="const * exp($(round(mu_right; digits=3))x)")
 
 # yaxis=:log plot of v and asympt on the left side
-end_ind = trunc(Int, ((NUM-2) / 2.1))
-plot(abs.(v[1:end_ind]), yaxis=:log, legend=:bottomright, xlim=(1e0, 1.4e3), ylim=(1e-5, 1e-1))#, shape=:circle)
-plot!(range(1, end_ind, length = NUM-2), x->abs(v_asympt(mu_left, ϵ_0 * A1, -H/2 + (x-1) * H / (NUM - 3))), style = :dashdot, label="const * exp($(round(mu_left; digits=3))x)", yaxis=:log)
-plot!(range(1, end_ind, length = NUM-2), x->abs(v_composite(-H/2 + (x-1) * H / (NUM - 3))), style=:solid, label="v asymptotic solution,\n ϵ_0=$ϵ_0", yaxis=:log)
+v_itp = interpolate(v, BSpline(Cubic(Natural(OnGrid()))));
+v_sitp = scale(v_itp, range(-H/2, H/2, length = NUM-2));
+plot(range(-H/2, H/2, length = NUM-2), abs.(v_sitp), legend=:bottomright, yaxis=:log, xlim=(-H/2, 0), ylim=(1e-5, 1e-1))#, shape=:circle)
+plot!(range(-H/2, H/2, length = NUM-2), x->abs(v_asympt(mu_left, ϵ_0 * A1, x)), style = :dashdot, label="const * exp($(round(mu_left; digits=3))x)")#, yaxis=:log)
+#plot!(range(-H/2, H/2, length = NUM-2), x->abs(v_composite(x)), style=:solid, label="v asymptotic solution,\n ϵ_0=$ϵ_0", yaxis=:log)
 
 #savefig("/home/shamil/Desktop/plot_v_asympt_k_" * "$k_test" * "_eps_" * "$ϵ_0" * ".pdf")
 #savefig("/home/shamil/Desktop/eigenfunc_NUM_2001_eps_0.0025.pdf")
