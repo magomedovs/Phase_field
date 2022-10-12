@@ -17,7 +17,7 @@ include("functions_Newton_Raphson.jl")
 include("save_data.jl")
 include("linear_sys_eigenvals.jl")
 
-H = 1     # domain size
+H = 10     # domain size
 S = length(ARGS) >= 1 ? parse(Float64, ARGS[1]) : 1.2 #1.1   # Stefan number, vary from 0.5 to 2
 ϵ_0 = length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : 0.005 #0.0025
 a_1 = 0.9 * (ϵ_0*100)
@@ -27,7 +27,7 @@ a_1 = 0.9 * (ϵ_0*100)
 m(T) = (a_1 / pi) * atan(β * (1 - T))
 m_prime(T) = -(a_1 * β / pi) * 1/(1 + (β * (1 - T))^2)
 
-M = length(ARGS) >= 3 ? parse(Int64, ARGS[3]) : 10001    # number of mesh points for Newton--Raphson. Must be odd number
+M = length(ARGS) >= 3 ? parse(Int64, ARGS[3]) : 100001    # number of mesh points for Newton--Raphson. Must be odd number
 Δh = H / (M - 1)
 
 α = (ϵ_0 / Δh)^2

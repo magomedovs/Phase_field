@@ -4,6 +4,7 @@ using FastGaussQuadrature
 using ClassicalOrthogonalPolynomials
 using LinearAlgebra
 using NLsolve
+using ForwardDiff
 
 S = 1.2         #length(ARGS) >= 1 ? parse(Float64, ARGS[1]) : 1.2  # Stefan number, vary from 0.5 to 2
 ϵ_0 = 0.005     #length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : 0.005
@@ -16,12 +17,12 @@ m_prime(T) = -(a_1 * β / pi) * 1/(1 + (β * (1 - T))^2)
 
 c_sharp_lim = ϵ_0 * a_1 * sqrt(2) / (pi * τ) * atan(β * (1.0 - 1/S))
 
-alpha_coef = 4.1
+alpha_coef = 2.1
 α = alpha_coef / c_sharp_lim   # find appropriate / optimal value !
 
 NUM = 200
 
-phi_init_band(x; shift=0)::Float64 = (tanh((x - shift) / (ϵ_0 * 2 * sqrt(2))) + 1 ) / 2
+phi_init_band(x; shift=0) = (tanh((x - shift) / (ϵ_0 * 2 * sqrt(2))) + 1 ) / 2
 
 function T_composite_solution(x; shift=0, c=c_sharp_lim)::Float64    
     function T_outer_solution(x, shift)
@@ -70,38 +71,46 @@ function calculate_cheb_colloc_expansion_coeffs(test_function::Function, N; dist
     return a_i
 end
 
+# phi_approx_mapped(x) = phi_init_band(α * atanh(x))
+beta = α / (ϵ_0 * 2 * sqrt(2))
+function phi_approx_mapped(x)
+    return (1+x)^beta / ((1+x)^beta + (1-x)^beta)
+end
+
+phi_approx_mapped_prime(x) = ForwardDiff.derivative(phi_approx_mapped, x)
+phi_approx_mapped_double_prime(x) = ForwardDiff.derivative(y -> ForwardDiff.derivative(phi_approx_mapped, y), x)
 
 function f!(F, x)
 
     nodes, _ = gausschebyshev(NUM - 2)
 
     F[1:5] = [
-        # B.C. for ϕ
+        # B.C. for ψ
         x[1 : NUM]' * [chebyshevt(k, -1) for k=0:NUM-1],
-        x[1 : NUM]' * [chebyshevt(k, 1) for k=0:NUM-1] - 1,
-        x[1 : NUM]' * [chebyshevt(k, 0) for k=0:NUM-1] - 1/2,
+        x[1 : NUM]' * [chebyshevt(k, 1) for k=0:NUM-1],
+        x[1 : NUM]' * [chebyshevt(k, 0) for k=0:NUM-1],
         
         # B.C. for T
         x[NUM+1 : 2*NUM]' * [chebyshevt(k, -1) for k=0:NUM-1] - 1/S,
         x[NUM+1 : 2*NUM]' * [chebyshevt(k, 1) for k=0:NUM-1],
     ]
 
-    # equations for ϕ
+    # equations for ψ
     #=
-    for i=1 : NUM-2 #6:(6 - 1 + NUM-2)
-        F[5 + i] = -(ϵ_0 / α)^2 * (1 - nodes[i]^2) * (x[1 : NUM]' * [k * ((k+1) * chebyshevt(k, nodes[i]) - chebyshevu(k, nodes[i])) for k=0:NUM-1]) +
-                    #1/α^2 * (1 - nodes[i]^2) * (α * τ * x[2*NUM + 1] - 2 * ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
-                    (1 - nodes[i]^2) * (τ/α * x[2*NUM + 1] - 2 * (ϵ_0 / α)^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
-                    (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) * (1 - x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) *
-                    (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] - 1/2 - m(x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]))
+    for i=1 : NUM-2
+        F[5 + i] = -ϵ_0^2 * (1 - nodes[i]^2) * (x[1 : NUM]' * [k * ((k+1) * chebyshevt(k, nodes[i]) - chebyshevu(k, nodes[i])) for k=0:NUM-1]) +
+                    (1 - nodes[i]^2) * (α * τ * x[2*NUM + 1] - 2 * ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
+                    α^2 * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] + phi_approx_mapped(nodes[i])) * (1 - x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] - phi_approx_mapped(nodes[i])) *
+                    (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] + phi_approx_mapped(nodes[i]) - 1/2 - m(x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1])) + 
+                    ϵ_0^2 * (1 - nodes[i]^2)^2 * phi_approx_mapped_double_prime(nodes[i]) + 
+                    (1 - nodes[i]^2) * (α * τ * x[2*NUM + 1] - 2 * ϵ_0^2 * nodes[i]) * phi_approx_mapped_prime(nodes[i])
     end
     =#
-    for i=1 : NUM-2 #6:(6 - 1 + NUM-2)
-        F[5 + i] = -ϵ_0^2 * (1 - nodes[i]^2) * (x[1 : NUM]' * [k * ((k+1) * chebyshevt(k, nodes[i]) - chebyshevu(k, nodes[i])) for k=0:NUM-1]) +
-                    #1/α^2 * (1 - nodes[i]^2) * (α * τ * x[2*NUM + 1] - 2 * ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
-                    (1 - nodes[i]^2) * (α * τ * x[2*NUM + 1] - 2 * ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
-                    α^2 * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) * (1 - x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) *
-                    (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] - 1/2 - m(x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]))
+    for i=1 : NUM-2
+        F[5 + i] = -ϵ_0^2 * (1 - nodes[i]^2) * (x[1 : NUM]' * [k * ((k+1) * chebyshevt(k, nodes[i]) - chebyshevu(k, nodes[i])) for k=0:NUM-1] - (1 - nodes[i]^2) * phi_approx_mapped_double_prime(nodes[i])) +
+                    (1 - nodes[i]^2) * (α * τ * x[2*NUM + 1] - 2 * ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]] + phi_approx_mapped_prime(nodes[i])) +
+                    α^2 * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] + phi_approx_mapped(nodes[i])) * (1 - x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] - phi_approx_mapped(nodes[i])) *
+                    (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] + phi_approx_mapped(nodes[i]) - 1/2 - m(x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]))                
     end
 
     # equations for T
@@ -109,16 +118,8 @@ function f!(F, x)
     for i=1 : NUM-2
         F[5 + NUM-2 + i] = 1/α * (1 - nodes[i]^2) * (x[NUM+1 : 2*NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
                             x[2*NUM + 1] * (x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) +
-                            x[2*NUM + 1] / S * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) - x[2*NUM + 1] / S 
+                            x[2*NUM + 1] / S * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] + phi_approx_mapped(nodes[i])) - x[2*NUM + 1] / S 
     end
-    #=
-    # Second order
-    for i=1 : NUM-2
-        F[5 + NUM-2 + i] = -(1 - nodes[i]^2) * (x[NUM+1 : 2*NUM]' * [k * ((k+1) * chebyshevt(k, nodes[i]) - chebyshevu(k, nodes[i])) for k=0:NUM-1]) + 
-                            (1 - nodes[i]^2) * (α * x[2*NUM + 1] - 2 * nodes[i]) * (x[NUM+1 : 2*NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
-                            x[2*NUM + 1] * α / S * (1 - nodes[i]^2) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]])
-    end
-    =#
 end
 
 phi_init_coefs = calculate_cheb_colloc_expansion_coeffs(x -> phi_init_band((α * atanh(x))), NUM)
@@ -128,12 +129,13 @@ if isnan(T_init_coefs[1]) || isnan(phi_init_coefs[1])
     println("Initial guess values contain NaN!")
 end
 
-sol = @time nlsolve(f!, [phi_init_coefs; T_init_coefs; 15.], autodiff = :forward, method = :newton,
+sol = @time nlsolve(f!, [fill(0., NUM); T_init_coefs; 15.], autodiff = :forward, method = :newton,
         ftol=1e-13, xtol=1e-16, show_trace=true)#, iterations=50)    
     
 x = range(-1, 1, length=Int(1e4))
 
-phi_computed(x) = chebyshev_expansion(sol.zero[1:NUM], x)
+# ϕ = ψ + phi_approx_mapped
+psi_computed(x) = chebyshev_expansion(sol.zero[1:NUM], x)
 T_computed(x) = chebyshev_expansion(sol.zero[NUM+1:2*NUM], x)
 
 println("Number of terms = $(NUM)")
@@ -141,10 +143,10 @@ println("α = $(α)")
 println("Computed velocity c = $(sol.zero[end])")
 
 plot(
-    x, x -> phi_computed(x),# xlims=(1-1e-5, 1), ylims=(0, 1e-6),
+    x, x -> psi_computed(x),# xlims=(1-1e-5, 1), ylims=(0, 1e-6),
     #ylabel="f(x)",
     xlabel="x",
-    label="phi(x)",
+    label="psi(x)",
     #legend=:bottomleft
 )
 plot!(
@@ -157,10 +159,19 @@ plot!(
 
 #=
 plot!(
+    x, x -> phi_approx_mapped(x),
+    #ylabel="f(x)",
+    xlabel="x",
+    label="phi(x)",
+    #legend=:bottomleft
+)
+=#
+#=
+plot!(
     x, x -> phi_init_band(α * atanh(x)),
     #ylabel="f(x)",
     xlabel="x",
-    label="T(x)",
+    label="phi(x)",
     #legend=:bottomleft
 )
 =#
@@ -185,7 +196,7 @@ plot!(
 )
 
 plot!(
-    eta_span, eta -> phi_computed(tanh(eta/α)), 
+    eta_span, eta -> psi_computed(tanh(eta/α)), 
     #ylabel="f(x)",
     xlabel="x",
     label="phi(x)",
