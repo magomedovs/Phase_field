@@ -16,10 +16,10 @@ m_prime(T) = -(a_1 * β / pi) * 1/(1 + (β * (1 - T))^2)
 
 c_sharp_lim = ϵ_0 * a_1 * sqrt(2) / (pi * τ) * atan(β * (1.0 - 1/S))
 
-alpha_coef = 3.0
+alpha_coef = 4.1
 α = alpha_coef / c_sharp_lim   # find appropriate / optimal value !
 
-NUM = 200
+NUM = 300
 
 phi_init_band(x; shift=0)::Float64 = (tanh((x - shift) / (ϵ_0 * 2 * sqrt(2))) + 1 ) / 2
 
@@ -105,18 +105,20 @@ function f!(F, x)
     end
 
     # equations for T
-    #=
+    # First order
     for i=1 : NUM-2
-        F[5 + NUM-2 + i] = 1/α * (1 - nodes[i]^2) * (x[NUM+1 : 2*NUM]' * [0; [chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
+        F[5 + NUM-2 + i] = 1/α * (1 - nodes[i]^2) * (x[NUM+1 : 2*NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
                             x[2*NUM + 1] * (x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) +
                             x[2*NUM + 1] / S * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) - x[2*NUM + 1] / S 
     end
-    =#
+    #=
+    # Second order
     for i=1 : NUM-2
         F[5 + NUM-2 + i] = -(1 - nodes[i]^2) * (x[NUM+1 : 2*NUM]' * [k * ((k+1) * chebyshevt(k, nodes[i]) - chebyshevu(k, nodes[i])) for k=0:NUM-1]) + 
                             (1 - nodes[i]^2) * (α * x[2*NUM + 1] - 2 * nodes[i]) * (x[NUM+1 : 2*NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
                             x[2*NUM + 1] * α / S * (1 - nodes[i]^2) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]])
     end
+    =#
 end
 
 phi_init_coefs = calculate_cheb_colloc_expansion_coeffs(x -> phi_init_band((α * atanh(x))), NUM)
