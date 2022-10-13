@@ -16,7 +16,7 @@ m_prime(T) = -(a_1 * β / pi) * 1/(1 + (β * (1 - T))^2)
 
 c_sharp_lim = ϵ_0 * a_1 * sqrt(2) / (pi * τ) * atan(β * (1.0 - 1/S))
 
-alpha_coef = 4.1
+alpha_coef = 2.1
 α = alpha_coef / c_sharp_lim   # find appropriate / optimal value !
 
 NUM = 200
@@ -96,7 +96,7 @@ function f!(F, x)
                     (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] - 1/2 - m(x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]))
     end
     =#
-    for i=1 : NUM-2 #6:(6 - 1 + NUM-2)
+    Threads.@threads for i=1 : NUM-2 #6:(6 - 1 + NUM-2)
         F[5 + i] = -ϵ_0^2 * (1 - nodes[i]^2) * (x[1 : NUM]' * [k * ((k+1) * chebyshevt(k, nodes[i]) - chebyshevu(k, nodes[i])) for k=0:NUM-1]) +
                     #1/α^2 * (1 - nodes[i]^2) * (α * τ * x[2*NUM + 1] - 2 * ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
                     (1 - nodes[i]^2) * (α * τ * x[2*NUM + 1] - 2 * ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
@@ -106,7 +106,7 @@ function f!(F, x)
 
     # equations for T
     # First order
-    for i=1 : NUM-2
+    Threads.@threads for i=1 : NUM-2
         F[5 + NUM-2 + i] = 1/α * (1 - nodes[i]^2) * (x[NUM+1 : 2*NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
                             x[2*NUM + 1] * (x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) +
                             x[2*NUM + 1] / S * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) - x[2*NUM + 1] / S 

@@ -80,6 +80,9 @@ end
 phi_approx_mapped_prime(x) = ForwardDiff.derivative(phi_approx_mapped, x)
 phi_approx_mapped_double_prime(x) = ForwardDiff.derivative(y -> ForwardDiff.derivative(phi_approx_mapped, y), x)
 
+T_shift_func(x) = (-x + 1) / (2 * S)
+T_shift_func_prime = -1 / (2 * S)
+
 function f!(F, x)
 
     nodes, _ = gausschebyshev(NUM - 2)
@@ -106,7 +109,7 @@ function f!(F, x)
                     (1 - nodes[i]^2) * (α * τ * x[2*NUM + 1] - 2 * ϵ_0^2 * nodes[i]) * phi_approx_mapped_prime(nodes[i])
     end
     =#
-    for i=1 : NUM-2
+    Threads.@threads for i=1 : NUM-2
         F[5 + i] = -ϵ_0^2 * (1 - nodes[i]^2) * (x[1 : NUM]' * [k * ((k+1) * chebyshevt(k, nodes[i]) - chebyshevu(k, nodes[i])) for k=0:NUM-1] - (1 - nodes[i]^2) * phi_approx_mapped_double_prime(nodes[i])) +
                     (1 - nodes[i]^2) * (α * τ * x[2*NUM + 1] - 2 * ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]] + phi_approx_mapped_prime(nodes[i])) +
                     α^2 * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] + phi_approx_mapped(nodes[i])) * (1 - x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] - phi_approx_mapped(nodes[i])) *
@@ -115,7 +118,7 @@ function f!(F, x)
 
     # equations for T
     # First order
-    for i=1 : NUM-2
+    Threads.@threads for i=1 : NUM-2
         F[5 + NUM-2 + i] = 1/α * (1 - nodes[i]^2) * (x[NUM+1 : 2*NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
                             x[2*NUM + 1] * (x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) +
                             x[2*NUM + 1] / S * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] + phi_approx_mapped(nodes[i])) - x[2*NUM + 1] / S 
@@ -129,6 +132,7 @@ if isnan(T_init_coefs[1]) || isnan(phi_init_coefs[1])
     println("Initial guess values contain NaN!")
 end
 
+# @profview 
 sol = @time nlsolve(f!, [fill(0., NUM); T_init_coefs; 15.], autodiff = :forward, method = :newton,
         ftol=1e-13, xtol=1e-16, show_trace=true)#, iterations=50)    
     
