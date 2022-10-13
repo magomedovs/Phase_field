@@ -27,7 +27,7 @@ a_1 = 0.9 * (ϵ_0*100)
 m(T) = (a_1 / pi) * atan(β * (1 - T))
 m_prime(T) = -(a_1 * β / pi) * 1/(1 + (β * (1 - T))^2)
 
-M = length(ARGS) >= 3 ? parse(Int64, ARGS[3]) : 100001    # number of mesh points for Newton--Raphson. Must be odd number
+M = length(ARGS) >= 3 ? parse(Int64, ARGS[3]) : 500001    # number of mesh points for Newton--Raphson. Must be odd number
 Δh = H / (M - 1)
 
 α = (ϵ_0 / Δh)^2

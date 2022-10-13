@@ -1,5 +1,6 @@
 using NLsolve
 using LsqFit
+using Plots
 
 # Function for Richardson extrapolation of "c"
 function extrapolate_c(h_list, c_list)
@@ -20,7 +21,7 @@ end
 
 # Uploading data
 computed_arr = []
-for line in eachline("/Users/shamilmagomedov/Desktop/calculated_c_eps0.005.txt")
+for line in eachline("/Users/shamilmagomedov/Desktop/calculated_c.txt")
     append!(computed_arr, [map(x -> parse(Float64, x), split(line, " "))])
 end
 
@@ -91,9 +92,8 @@ plot!(range(findmin(h_arr)[1], findmax(h_arr)[1], length=Int(1e5)),
 
 #savefig("/Users/shamilmagomedov/Desktop/c_plot_S_" * "$S" * "_eps_" * "$ϵ_0" * ".pdf")
 
-cov = estimate_covar(fit)
-
-se = stderror(fit)
+#cov = estimate_covar(fit)
+#se = stderror(fit)
 
 #=
 plot(h_arr, c_arr,

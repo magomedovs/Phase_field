@@ -146,6 +146,8 @@ println("Number of terms = $(NUM)")
 println("α = $(α)")
 println("Computed velocity c = $(sol.zero[end])")
 
+#println("psi max = ", findmax(psi_computed.(x))[1])
+
 plot(
     x, x -> psi_computed(x),# xlims=(1-1e-5, 1), ylims=(0, 1e-6),
     #ylabel="f(x)",
@@ -158,6 +160,13 @@ plot!(
     #ylabel="f(x)",
     xlabel="x",
     label="T(x)",
+    #legend=:bottomleft
+)
+plot!(
+    x, x -> phi_approx_mapped(x) + psi_computed(x), 
+    #ylabel="f(x)",
+    xlabel="x",
+    label="phi(x)",
     #legend=:bottomleft
 )
 
