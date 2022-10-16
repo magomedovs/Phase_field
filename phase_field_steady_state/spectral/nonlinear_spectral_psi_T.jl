@@ -6,21 +6,21 @@ using LinearAlgebra
 using NLsolve
 using ForwardDiff
 
-S = 1.2         #length(ARGS) >= 1 ? parse(Float64, ARGS[1]) : 1.2  # Stefan number, vary from 0.5 to 2
-ϵ_0 = 0.005     #length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : 0.005
-a_1 = 0.9 * (ϵ_0*100)
-β = 10.0
-τ = 0.0003 * (ϵ_0*100)^2
+const S = 1.2         #length(ARGS) >= 1 ? parse(Float64, ARGS[1]) : 1.2  # Stefan number, vary from 0.5 to 2
+const ϵ_0 = 0.005     #length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : 0.005
+const a_1 = 0.9 * (ϵ_0*100)
+const β = 10.0
+const τ = 0.0003 * (ϵ_0*100)^2
 
 m(T) = (a_1 / pi) * atan(β * (1 - T))
 m_prime(T) = -(a_1 * β / pi) * 1/(1 + (β * (1 - T))^2)
 
-c_sharp_lim = ϵ_0 * a_1 * sqrt(2) / (pi * τ) * atan(β * (1.0 - 1/S))
+const c_sharp_lim = ϵ_0 * a_1 * sqrt(2) / (pi * τ) * atan(β * (1.0 - 1/S))
 
-alpha_coef = 2.1
-α = alpha_coef / c_sharp_lim   # find appropriate / optimal value !
+const alpha_coef = 2.1
+const α = alpha_coef / c_sharp_lim   # find appropriate / optimal value !
 
-NUM = 200
+const NUM = 200
 
 phi_init_band(x; shift=0) = (tanh((x - shift) / (ϵ_0 * 2 * sqrt(2))) + 1 ) / 2
 
@@ -72,7 +72,7 @@ function calculate_cheb_colloc_expansion_coeffs(test_function::Function, N; dist
 end
 
 # phi_approx_mapped(x) = phi_init_band(α * atanh(x))
-beta = α / (ϵ_0 * 2 * sqrt(2))
+const beta = α / (ϵ_0 * 2 * sqrt(2))
 function phi_approx_mapped(x)
     return (1+x)^beta / ((1+x)^beta + (1-x)^beta)
 end
@@ -125,15 +125,16 @@ function f!(F, x)
     end
 end
 
-phi_init_coefs = calculate_cheb_colloc_expansion_coeffs(x -> phi_init_band((α * atanh(x))), NUM)
+#phi_init_coefs = calculate_cheb_colloc_expansion_coeffs(x -> phi_init_band((α * atanh(x))), NUM)
+psi_init_coefs = fill(0., NUM)
 T_init_coefs = calculate_cheb_colloc_expansion_coeffs(x -> T_composite_solution((α * atanh(x))), NUM)
 
-if isnan(T_init_coefs[1]) || isnan(phi_init_coefs[1])
+if isnan(T_init_coefs[1]) || isnan(psi_init_coefs[1])
     println("Initial guess values contain NaN!")
 end
 
 # @profview 
-sol = @time nlsolve(f!, [fill(0., NUM); T_init_coefs; 15.], autodiff = :forward, method = :newton,
+sol = @time nlsolve(f!, [psi_init_coefs; T_init_coefs; 15.], autodiff = :forward, method = :newton,
         ftol=1e-13, xtol=1e-16, show_trace=true)#, iterations=50)    
     
 x = range(-1, 1, length=Int(1e4))
@@ -145,6 +146,12 @@ T_computed(x) = chebyshev_expansion(sol.zero[NUM+1:2*NUM], x)
 println("Number of terms = $(NUM)")
 println("α = $(α)")
 println("Computed velocity c = $(sol.zero[end])")
+
+#=
+farr = zeros(2*NUM + 1)
+a = [psi_init_coefs; T_init_coefs; 15.]
+@code_warntype f!(farr, a)
+=#
 
 #println("psi max = ", findmax(psi_computed.(x))[1])
 
