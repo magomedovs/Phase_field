@@ -2,21 +2,22 @@ using NLsolve
 using LsqFit
 using Plots
 
-# Function for Richardson extrapolation of "c"
-function extrapolate_c(h_list, c_list)
-    if (length(h_list) != length(c_list))
+# Function for Richardson extrapolation
+# A(h) = A₀ + C₁ * h^{1 * p} + C₂ * h^{2 * p} + O(h^{3 * p})
+function extrapolate_func(h_array, A_array; p=2)
+    if (length(h_array) != length(A_array))
         println("Arrays dimensions don't coincide!")
         return 0
     end
 
-    h_mat = h_list.^(2*0)
-    for i=1:(length(c_list)-1)
-        h_mat = [h_mat h_list.^(2*i)]
+    h_mat = h_array.^(p * 0)
+    for i=1:(length(A_array)-1)
+        h_mat = [h_mat h_array.^(p * i)]
     end
 
-    println(h_mat)
-
-    res = h_mat \ c_list
+    #println(h_mat)
+    res = h_mat \ A_array
+    return res
 end
 
 # Uploading data
@@ -61,7 +62,7 @@ inds = [1, 4, 7, 9]
 
 h_list = [h_arr[i] for i in inds]
 c_list = [c_arr[i] for i in inds]
-res_estim = extrapolate_c(h_list, c_list)
+res_estim = extrapolate_func(h_list, c_list)
 
 
 # Curve fitting
@@ -76,8 +77,8 @@ h2_coef = res[2]
 #c_extrap = res_estim[1]
 #h2_coef = res_estim[2]
 
-#extrapolate_c([h_arr[10],h_arr[12],h_arr[14]], [c_arr[10],c_arr[12],c_arr[14]])
-#extrapolate_c([h_arr[10],h_arr[12],h_arr[14], h_arr[16]], [c_arr[10],c_arr[12],c_arr[14], c_arr[16]])
+#extrapolate_func([h_arr[10],h_arr[12],h_arr[14]], [c_arr[10],c_arr[12],c_arr[14]])
+#extrapolate_func([h_arr[10],h_arr[12],h_arr[14], h_arr[16]], [c_arr[10],c_arr[12],c_arr[14], c_arr[16]])
 
 # Plot of c(h) with extrapolated value of c
 errors_arr = abs.(c_arr .- c_extrap) / c_extrap

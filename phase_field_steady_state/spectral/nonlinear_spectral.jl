@@ -5,21 +5,21 @@ using ClassicalOrthogonalPolynomials
 using LinearAlgebra
 using NLsolve
 
-S = 1.2         #length(ARGS) >= 1 ? parse(Float64, ARGS[1]) : 1.2  # Stefan number, vary from 0.5 to 2
-ϵ_0 = 0.005     #length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : 0.005
-a_1 = 0.9 * (ϵ_0*100)
-β = 10.0
-τ = 0.0003 * (ϵ_0*100)^2
+const S = 1.2         #length(ARGS) >= 1 ? parse(Float64, ARGS[1]) : 1.2  # Stefan number, vary from 0.5 to 2
+const ϵ_0 = 0.005     #length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : 0.005
+const a_1 = 0.9 * (ϵ_0*100)
+const β = 10.0
+const τ = 0.0003 * (ϵ_0*100)^2
 
 m(T) = (a_1 / pi) * atan(β * (1 - T))
 m_prime(T) = -(a_1 * β / pi) * 1/(1 + (β * (1 - T))^2)
 
-c_sharp_lim = ϵ_0 * a_1 * sqrt(2) / (pi * τ) * atan(β * (1.0 - 1/S))
+const c_sharp_lim = ϵ_0 * a_1 * sqrt(2) / (pi * τ) * atan(β * (1.0 - 1/S))
 
-alpha_coef = 2.1
-α = alpha_coef / c_sharp_lim   # find appropriate / optimal value !
+const alpha_coef = 2.1
+const α = alpha_coef / c_sharp_lim   # find appropriate / optimal value !
 
-NUM = 200
+const NUM = 200
 
 phi_init_band(x; shift=0)::Float64 = (tanh((x - shift) / (ϵ_0 * 2 * sqrt(2))) + 1 ) / 2
 
