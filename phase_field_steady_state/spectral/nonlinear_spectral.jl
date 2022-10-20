@@ -16,10 +16,13 @@ m_prime(T) = -(a_1 * β / pi) * 1/(1 + (β * (1 - T))^2)
 
 const c_sharp_lim = ϵ_0 * a_1 * sqrt(2) / (pi * τ) * atan(β * (1.0 - 1/S))
 
-const alpha_coef = 2.1
+const alpha_coef = 2.3
 const α = alpha_coef / c_sharp_lim   # find appropriate / optimal value !
 
-const NUM = 200
+const NUM = length(ARGS) >= 1 ? parse(Int64, ARGS[1]) : 200
+
+println("Number of terms = $(NUM)")
+println("α = $(α)")
 
 phi_init_band(x; shift=0)::Float64 = (tanh((x - shift) / (ϵ_0 * 2 * sqrt(2))) + 1 ) / 2
 
@@ -136,9 +139,19 @@ x = range(-1, 1, length=Int(1e4))
 phi_computed(x) = chebyshev_expansion(sol.zero[1:NUM], x)
 T_computed(x) = chebyshev_expansion(sol.zero[NUM+1:2*NUM], x)
 
-println("Number of terms = $(NUM)")
-println("α = $(α)")
-println("Computed velocity c = $(sol.zero[end])")
+c_computed = sol.zero[end]
+println("Computed velocity c = $(c_computed)")
+
+
+#=
+# Writing computed data into file
+io = open("/Users/shamilmagomedov/Desktop/spectral_calculated_c.txt", "a")
+
+write(io, "$NUM $c_computed $c_sharp_lim $S $ϵ_0\n")
+
+close(io)
+=#
+
 
 plot(
     x, x -> phi_computed(x),# xlims=(1-1e-5, 1), ylims=(0, 1e-6),
@@ -154,6 +167,7 @@ plot!(
     label="T(x)",
     #legend=:bottomleft
 )
+
 
 #=
 plot!(

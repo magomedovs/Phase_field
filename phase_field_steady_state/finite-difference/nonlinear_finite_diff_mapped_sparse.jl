@@ -19,11 +19,13 @@ m_prime(T) = -(a_1 * β / pi) * 1/(1 + (β * (1 - T))^2)
 
 const c_sharp_lim = ϵ_0 * a_1 * sqrt(2) / (pi * τ) * atan(β * (1.0 - 1/S))
 
-const alpha_coef = 2.1
+const alpha_coef = 2.3
 const α = alpha_coef / c_sharp_lim   # find appropriate / optimal value !
 
-
 const NUM = 20001
+
+println("Number of terms = $(NUM)")
+println("α = $(α)")
 
 phi_init_band(x; shift=0)::Float64 = (tanh((x - shift) / (ϵ_0 * 2 * sqrt(2))) + 1 ) / 2
 
@@ -222,9 +224,9 @@ df = OnceDifferentiable(f!, j!, rand(2*NUM + 1), rand(2*NUM + 1), spzeros(2*NUM 
 sol = @time nlsolve(df, [phi_init_coefs; T_init_coefs; 15.], method = :newton,
         ftol=1e-8, xtol=1e-16, show_trace=true)#, iterations=50)    
 
-println("Number of terms = $(NUM)")
-println("α = $(α)")
-println("Computed velocity c = $(sol.zero[end])")
+c_computed = sol.zero[end]
+println("Computed velocity c = $(c_computed)")
+
 #=
 plot(
     x, sol.zero[1:NUM],# xlims=(1-1e-5, 1), ylims=(0, 1e-6),
