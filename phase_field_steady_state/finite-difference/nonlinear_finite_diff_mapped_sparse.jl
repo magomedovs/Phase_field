@@ -22,7 +22,7 @@ const c_sharp_lim = ϵ_0 * a_1 * sqrt(2) / (pi * τ) * atan(β * (1.0 - 1/S))
 const alpha_coef = 2.3
 const α = alpha_coef / c_sharp_lim   # find appropriate / optimal value !
 
-const NUM = 20001
+const NUM = length(ARGS) >= 1 ? parse(Int64, ARGS[1]) : 20001
 
 println("Number of terms = $(NUM)")
 println("α = $(α)")
@@ -222,10 +222,19 @@ df = OnceDifferentiable(f!, j!, rand(2*NUM + 1), rand(2*NUM + 1), spzeros(2*NUM 
 #@profview 
 
 sol = @time nlsolve(df, [phi_init_coefs; T_init_coefs; 15.], method = :newton,
-        ftol=1e-8, xtol=1e-16, show_trace=true)#, iterations=50)    
+        ftol=1e-8, xtol=1e-16, show_trace=true, iterations=5)
 
 c_computed = sol.zero[end]
 println("Computed velocity c = $(c_computed)")
+
+#=
+# Writing computed data into file
+io = open("/Users/shamilmagomedov/Desktop/finite_diff_calculated_c.txt", "a")
+
+write(io, "$(2. / (NUM - 1)) $c_computed $c_sharp_lim $S $ϵ_0\n")
+
+close(io)
+=#
 
 #=
 plot(
