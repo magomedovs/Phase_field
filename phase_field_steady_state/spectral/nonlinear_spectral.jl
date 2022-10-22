@@ -19,7 +19,7 @@ const c_sharp_lim = ϵ_0 * a_1 * sqrt(2) / (pi * τ) * atan(β * (1.0 - 1/S))
 const alpha_coef = 2.3
 const α = alpha_coef / c_sharp_lim   # find appropriate / optimal value !
 
-const NUM = length(ARGS) >= 1 ? parse(Int64, ARGS[1]) : 200
+const NUM = length(ARGS) >= 1 ? parse(Int64, ARGS[1]) : 300
 
 println("Number of terms = $(NUM)")
 println("α = $(α)")
@@ -91,7 +91,7 @@ function f!(F, x)
 
     # equations for ϕ
     #=
-    for i=1 : NUM-2 #6:(6 - 1 + NUM-2)
+    for i=1 : NUM-2
         F[5 + i] = -(ϵ_0 / α)^2 * (1 - nodes[i]^2) * (x[1 : NUM]' * [k * ((k+1) * chebyshevt(k, nodes[i]) - chebyshevu(k, nodes[i])) for k=0:NUM-1]) +
                     #1/α^2 * (1 - nodes[i]^2) * (α * τ * x[2*NUM + 1] - 2 * ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
                     (1 - nodes[i]^2) * (τ/α * x[2*NUM + 1] - 2 * (ϵ_0 / α)^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
@@ -99,7 +99,7 @@ function f!(F, x)
                     (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] - 1/2 - m(x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]))
     end
     =#
-    Threads.@threads for i=1 : NUM-2 #6:(6 - 1 + NUM-2)
+    Threads.@threads for i=1 : NUM-2
         F[5 + i] = -ϵ_0^2 * (1 - nodes[i]^2) * (x[1 : NUM]' * [k * ((k+1) * chebyshevt(k, nodes[i]) - chebyshevu(k, nodes[i])) for k=0:NUM-1]) +
                     #1/α^2 * (1 - nodes[i]^2) * (α * τ * x[2*NUM + 1] - 2 * ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
                     (1 - nodes[i]^2) * (α * τ * x[2*NUM + 1] - 2 * ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
@@ -110,9 +110,10 @@ function f!(F, x)
     # equations for T
     # First order
     Threads.@threads for i=1 : NUM-2
-        F[5 + NUM-2 + i] = 1/α * (1 - nodes[i]^2) * (x[NUM+1 : 2*NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
-                            x[2*NUM + 1] * (x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) +
-                            x[2*NUM + 1] / S * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) - x[2*NUM + 1] / S 
+        F[5 + NUM-2 + i] = (1 - nodes[i]^2) * (x[NUM+1 : 2*NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
+                            α * x[2*NUM + 1] * (x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) +
+                            α * x[2*NUM + 1] / S * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) - 
+                            α * x[2*NUM + 1] / S 
     end
     #=
     # Second order
