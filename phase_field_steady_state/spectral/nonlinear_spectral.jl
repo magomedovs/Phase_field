@@ -4,171 +4,113 @@ using FastGaussQuadrature
 using ClassicalOrthogonalPolynomials
 using LinearAlgebra
 using NLsolve
+using DelimitedFiles
 
-const S = 1.2         #length(ARGS) >= 1 ? parse(Float64, ARGS[1]) : 1.2  # Stefan number, vary from 0.5 to 2
-const ϵ_0 = 0.005     #length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : 0.005
-const a_1 = 0.9 * (ϵ_0*100)
-const β = 10.0
-const τ = 0.0003 * (ϵ_0*100)^2
+include("Cheb_expansion.jl")
+include("../structs_and_functions.jl")
 
-m(T) = (a_1 / pi) * atan(β * (1 - T))
-m_prime(T) = -(a_1 * β / pi) * 1/(1 + (β * (1 - T))^2)
+function calculate_spectral(NUM::Int64, p::Params; save_solution=false, output_filename="spectral_solution_coeffs_NUM_$(NUM).txt")
 
-const c_sharp_lim = ϵ_0 * a_1 * sqrt(2) / (pi * τ) * atan(β * (1.0 - 1/S))
+    println("Number of terms = $(NUM)")
 
-const alpha_coef = 2.3
-const α = alpha_coef / c_sharp_lim   # find appropriate / optimal value !
+    function f!(F, x)#, p::Params)
 
-const NUM = length(ARGS) >= 1 ? parse(Int64, ARGS[1]) : 300
+        nodes, _ = gausschebyshev(NUM - 2)
 
-println("Number of terms = $(NUM)")
-println("α = $(α)")
+        F[1:5] = [
+            # B.C. for ϕ
+            x[1 : NUM]' * [chebyshevt(k, -1) for k=0:NUM-1],
+            x[1 : NUM]' * [chebyshevt(k, 1) for k=0:NUM-1] - 1,
+            x[1 : NUM]' * [chebyshevt(k, 0) for k=0:NUM-1] - 1/2,
+            
+            # B.C. for T
+            x[NUM+1 : 2*NUM]' * [chebyshevt(k, -1) for k=0:NUM-1] - 1/p.S,
+            x[NUM+1 : 2*NUM]' * [chebyshevt(k, 1) for k=0:NUM-1],
+        ]
 
-phi_init_band(x; shift=0)::Float64 = (tanh((x - shift) / (ϵ_0 * 2 * sqrt(2))) + 1 ) / 2
+        # equations for ϕ
+        Threads.@threads for i=1 : NUM-2
+            F[5 + i] = -p.ϵ_0^2 * (1 - nodes[i]^2) * (x[1 : NUM]' * [k * ((k+1) * chebyshevt(k, nodes[i]) - chebyshevu(k, nodes[i])) for k=0:NUM-1]) +
+                        #1/α^2 * (1 - nodes[i]^2) * (α * p.τ * x[2*NUM + 1] - 2 * p.ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
+                        (1 - nodes[i]^2) * (α * p.τ * x[2*NUM + 1] - 2 * p.ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
+                        α^2 * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) * (1 - x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) *
+                        (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] - 1/2 - m(x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1], p))
+        end
 
-function T_composite_solution(x; shift=0, c=c_sharp_lim)::Float64    
-    function T_outer_solution(x, shift)
-        if (x <= shift)
-            return 1/S
-        else
-            return 1/S * exp((-x + shift) * c)
+        # equations for T
+        Threads.@threads for i=1 : NUM-2
+            F[5 + NUM-2 + i] = (1 - nodes[i]^2) * (x[NUM+1 : 2*NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
+                                α * x[2*NUM + 1] * (x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) +
+                                α * x[2*NUM + 1] / p.S * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) - 
+                                α * x[2*NUM + 1] / p.S 
         end
     end
 
-    function T_inner_solution(x, shift)::Float64
-        return 1/S + ϵ_0 * (-(c * sqrt(2) / S) * log(2) - (c * sqrt(2) / S) * log(cosh((x - shift)/(ϵ_0 * 2^(3/2)))) + ((x - shift) / ϵ_0) * ( - c / (2 * S)) )
+    #f!(F, x) = f!(F, x, p)
+
+    phi_init_coefs = calculate_cheb_colloc_expansion_coeffs(x -> phi_approx((α * atanh(x)), p), NUM; dist_from_boundary=1e-13)
+    T_init_coefs = calculate_cheb_colloc_expansion_coeffs(x -> T_approx((α * atanh(x)), p), NUM; dist_from_boundary=1e-13)
+
+    if isnan(T_init_coefs[1]) || isnan(T_init_coefs[end]) || isnan(phi_init_coefs[1]) || isnan(phi_init_coefs[end])
+        println("Initial guess values contain NaN!")
+        return 0
     end
 
-    if (x <= shift)
-        return T_inner_solution(x, shift) + T_outer_solution(x, shift) - 1/S
-    else
-        return T_inner_solution(x, shift) + T_outer_solution(x, shift) - 1/S + (x - shift) * (c / S)
-    end
-end
+    sol = @time nlsolve(
+        f!, [phi_init_coefs; T_init_coefs; 15.], 
+        autodiff = :forward, method = :newton, 
+        ftol=1e-13, xtol=1e-16, show_trace=true, iterations=7
+    )    
 
-# chebyshev_expansion(x) = Σ aᵢ * Tᵢ(x)
-function chebyshev_expansion(a_i, x)
-    res = 0.
-    for i=0:( length(a_i) - 1 )
-        res += a_i[i+1] * chebyshevt(i, x)
-    end
-    return res
-end
-
-#cheb_nodes = [cos(pi/num_of_nodes * (1/2 + k)) for k=0:num_of_nodes-1]
-function calculate_cheb_colloc_expansion_coeffs(test_function::Function, N; dist_from_boundary=1e-13)
-    nodes, _ = gausschebyshev(N-2)
-
-    f_rhs::Vector{Float64} = [[test_function(nodes[i]) for i in eachindex(nodes)]; test_function(-1+dist_from_boundary); test_function(1-dist_from_boundary)]
-
-    A::Matrix{Float64} = Matrix{Float64}(undef, N::Int64, N::Int64)
-    for i in eachindex(nodes)
-        A[i, :] = [chebyshevt(k, nodes[i]) for k=0:N-1]
-    end
-    A[N-1, :] = [chebyshevt(k, -1) for k=0:N-1]
-    A[N, :] = [chebyshevt(k, 1) for k=0:N-1]
-
-    a_i::Vector{Float64} = A \ f_rhs
-
-    return a_i
-end
-
-
-function f!(F, x)
-
-    nodes, _ = gausschebyshev(NUM - 2)
-
-    F[1:5] = [
-        # B.C. for ϕ
-        x[1 : NUM]' * [chebyshevt(k, -1) for k=0:NUM-1],
-        x[1 : NUM]' * [chebyshevt(k, 1) for k=0:NUM-1] - 1,
-        x[1 : NUM]' * [chebyshevt(k, 0) for k=0:NUM-1] - 1/2,
-        
-        # B.C. for T
-        x[NUM+1 : 2*NUM]' * [chebyshevt(k, -1) for k=0:NUM-1] - 1/S,
-        x[NUM+1 : 2*NUM]' * [chebyshevt(k, 1) for k=0:NUM-1],
-    ]
-
-    # equations for ϕ
-    #=
-    for i=1 : NUM-2
-        F[5 + i] = -(ϵ_0 / α)^2 * (1 - nodes[i]^2) * (x[1 : NUM]' * [k * ((k+1) * chebyshevt(k, nodes[i]) - chebyshevu(k, nodes[i])) for k=0:NUM-1]) +
-                    #1/α^2 * (1 - nodes[i]^2) * (α * τ * x[2*NUM + 1] - 2 * ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
-                    (1 - nodes[i]^2) * (τ/α * x[2*NUM + 1] - 2 * (ϵ_0 / α)^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
-                    (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) * (1 - x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) *
-                    (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] - 1/2 - m(x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]))
-    end
-    =#
-    Threads.@threads for i=1 : NUM-2
-        F[5 + i] = -ϵ_0^2 * (1 - nodes[i]^2) * (x[1 : NUM]' * [k * ((k+1) * chebyshevt(k, nodes[i]) - chebyshevu(k, nodes[i])) for k=0:NUM-1]) +
-                    #1/α^2 * (1 - nodes[i]^2) * (α * τ * x[2*NUM + 1] - 2 * ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
-                    (1 - nodes[i]^2) * (α * τ * x[2*NUM + 1] - 2 * ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
-                    α^2 * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) * (1 - x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) *
-                    (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] - 1/2 - m(x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]))
-    end
-
-    # equations for T
-    # First order
-    Threads.@threads for i=1 : NUM-2
-        F[5 + NUM-2 + i] = (1 - nodes[i]^2) * (x[NUM+1 : 2*NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
-                            α * x[2*NUM + 1] * (x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) +
-                            α * x[2*NUM + 1] / S * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) - 
-                            α * x[2*NUM + 1] / S 
-    end
-    #=
-    # Second order
-    for i=1 : NUM-2
-        F[5 + NUM-2 + i] = -(1 - nodes[i]^2) * (x[NUM+1 : 2*NUM]' * [k * ((k+1) * chebyshevt(k, nodes[i]) - chebyshevu(k, nodes[i])) for k=0:NUM-1]) + 
-                            (1 - nodes[i]^2) * (α * x[2*NUM + 1] - 2 * nodes[i]) * (x[NUM+1 : 2*NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
-                            x[2*NUM + 1] * α / S * (1 - nodes[i]^2) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]])
-    end
-    =#
-end
-
-phi_init_coefs = calculate_cheb_colloc_expansion_coeffs(x -> phi_init_band((α * atanh(x))), NUM)
-T_init_coefs = calculate_cheb_colloc_expansion_coeffs(x -> T_composite_solution((α * atanh(x))), NUM)
-
-if isnan(T_init_coefs[1]) || isnan(phi_init_coefs[1])
-    println("Initial guess values contain NaN!")
-end
-
-sol = @time nlsolve(f!, [phi_init_coefs; T_init_coefs; 15.], autodiff = :forward, method = :newton,
-        ftol=1e-13, xtol=1e-16, show_trace=true)#, iterations=50)    
+    phi_expansion_coeffs = sol.zero[1:NUM]
+    T_expansion_coeffs = sol.zero[NUM+1:2*NUM]
+    c_computed = sol.zero[end]
+    println("Computed velocity c = $(c_computed)")
     
-x = range(-1, 1, length=Int(1e4))
+    if save_solution
+        write_solution_to_file(output_filename, phi_expansion_coeffs, T_expansion_coeffs, c_computed)
+    end
 
-phi_computed(x) = chebyshev_expansion(sol.zero[1:NUM], x)
-T_computed(x) = chebyshev_expansion(sol.zero[NUM+1:2*NUM], x)
+    return phi_expansion_coeffs, T_expansion_coeffs, c_computed, sol
 
-c_computed = sol.zero[end]
-println("Computed velocity c = $(c_computed)")
+end
 
+params = Params(1.2, 0.005)
 
-#=
-# Writing computed data into file
-io = open("/Users/shamilmagomedov/Desktop/spectral_calculated_c.txt", "a")
+const alpha_coef = 2.3
+const α = alpha_coef / params.c_sharp_lim   # find appropriate / optimal value !
+println("α = $(α)")
 
-write(io, "$NUM $c_computed $c_sharp_lim $S $ϵ_0\n")
+#NUM = 200      # must be an even number!
+for NUM in [100] #[range(10, 50, step=4); range(60, 100, step=10); range(150, 1100, step=50)]
+    phi_expansion_coeffs, T_expansion_coeffs, c_computed = calculate_spectral(NUM, params; save_solution=false)
+end
 
-close(io)
-=#
+#phi_expansion_coeffs, T_expansion_coeffs, c_computed = read_solution_from_file("spectral_solution_coeffs_NUM_$(NUM).txt")
 
+phi_computed(x) = chebyshev_expansion(phi_expansion_coeffs, x)
+T_computed(x) = chebyshev_expansion(T_expansion_coeffs, x)
 
-plot(
-    x, x -> phi_computed(x),# xlims=(1-1e-5, 1), ylims=(0, 1e-6),
-    #ylabel="f(x)",
-    xlabel="x",
-    label="phi(x)",
-    #legend=:bottomleft
-)
-plot!(
-    x, x -> T_computed(x), 
-    #ylabel="f(x)",
-    xlabel="x",
-    label="T(x)",
-    #legend=:bottomleft
-)
+function plot_solution()
+    x = range(-1, 1, length=Int(1e4))
 
+    plot(
+        x, x -> phi_computed(x),# xlims=(1-1e-5, 1), ylims=(0, 1e-6),
+        #ylabel="f(x)",
+        xlabel="x",
+        label="phi(x)",
+        #legend=:bottomleft
+    )
+    plot!(
+        x, x -> T_computed(x), 
+        #ylabel="f(x)",
+        xlabel="x",
+        label="T(x)",
+        #legend=:bottomleft
+    )
+end
+
+#plot_solution()
 
 #=
 plot!(
