@@ -1,5 +1,5 @@
 using Printf
-using Plots
+#using Plots
 using FastGaussQuadrature
 using ClassicalOrthogonalPolynomials
 using LinearAlgebra
@@ -81,10 +81,10 @@ const alpha_coef = 2.3
 const α = alpha_coef / params.c_sharp_lim   # find appropriate / optimal value !
 println("α = $(α)")
 
-#NUM = 200      # must be an even number!
-for NUM in [100] #[range(10, 50, step=4); range(60, 100, step=10); range(150, 1100, step=50)]
+NUM = 200      # must be an even number!
+#for NUM in [100] #[range(10, 50, step=4); range(60, 100, step=10); range(150, 1100, step=50)]
     phi_expansion_coeffs, T_expansion_coeffs, c_computed = calculate_spectral(NUM, params; save_solution=false)
-end
+#end
 
 #phi_expansion_coeffs, T_expansion_coeffs, c_computed = read_solution_from_file("spectral_solution_coeffs_NUM_$(NUM).txt")
 

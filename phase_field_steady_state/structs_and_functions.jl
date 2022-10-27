@@ -47,7 +47,6 @@ function T_approx(x, p::Params; c = p.c_sharp_lim)::Float64
     end
 end
 
-
 function write_solution_to_file(filename::String, phi, T, c_computed::Float64)
     if isempty(phi) || isempty(T)
         println("Output array is empty!")

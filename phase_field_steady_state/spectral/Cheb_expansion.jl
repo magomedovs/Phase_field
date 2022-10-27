@@ -2,12 +2,20 @@ using FastGaussQuadrature
 using ClassicalOrthogonalPolynomials
 
 # chebyshev_expansion(x) = Σ aᵢ * Tᵢ(x)
-function chebyshev_expansion(a_i, x)
+function chebyshev_expansion(a_i::Vector{Float64}, x::Float64)::Float64
+    chebT = ChebyshevT()
+    return chebT[x, 1:length(a_i)]' * a_i
+    #=
     res = 0.
     for i=0:( length(a_i) - 1 )
         res += a_i[i+1] * chebyshevt(i, x)
     end
     return res
+    =#
+    #=
+    res = a_i' * [chebyshevt(i, x) for i=0:( length(a_i) - 1 )]
+    return res
+    =#
 end
 
 #cheb_nodes = [cos(pi/num_of_nodes * (1/2 + k)) for k=0:num_of_nodes-1]
