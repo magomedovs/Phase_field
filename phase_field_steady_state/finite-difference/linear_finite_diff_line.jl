@@ -1,6 +1,6 @@
 using Printf
-#using Plots
-using CairoMakie
+using Plots
+#using CairoMakie
 using ApproxFun
 using LinearAlgebra
 using LsqFit
@@ -68,7 +68,7 @@ function solve_eigen(phi, T, p::Params, k::Float64, NUM::Int64;
     println("NUM = ", NUM)
     println("k = ", k)
 
-    number_of_eigenvals = 100
+    number_of_eigenvals = 200
     println("number_of_eigenvals = ", number_of_eigenvals)
 
     # Computing eigenvalues of the matrix Mat
@@ -100,7 +100,7 @@ interval_start = -5.0
 interval_end = 2.2
 
 NUM = 10001
-k_test = 1.0e1
+k_test = 15. #1.0e1
 λs_test, X_test = solve_eigen(
     phi_computed_on_line, T_computed_on_line, params, k_test, NUM;
     c = c_computed, interval_start = interval_start, interval_end = interval_end
@@ -114,11 +114,11 @@ v = Real.(X_test[NUM-1:2*(NUM-2), findmax(map(x->x.re, λs_test))[2]])
 
 λs_test_max_re = findmax(map(x->x.re, λs_test))[1]
 
-C0 = u[findmax(u)[2]] * 4 * sqrt(2)
+C0 = u[findmax(abs.(u))[2]] * 4 * sqrt(2)
 u_composite(x, p::Params) = C0 / (4 * sqrt(2) * cosh(x / (p.ϵ_0 * 2 * sqrt(2)))^2)
 
 function v_composite(x, p::Params; front_vel=p.c_sharp_lim)
-    D2 = v[findmax(u)[2]] / p.ϵ_0 # - sign(v[div(NUM-2, 2) + 1]) * ϵ_0 * front_vel  # ??? guessed parameter value  # front_vel^2 / (2 * S * sqrt(4*(λs_test_max_re + k_test^2) + front_vel^2)) * C0
+    D2 = v[findmax(abs.(u))[2]] / p.ϵ_0 # - sign(v[div(NUM-2, 2) + 1]) * ϵ_0 * front_vel  # ??? guessed parameter value  # front_vel^2 / (2 * S * sqrt(4*(λs_test_max_re + k_test^2) + front_vel^2)) * C0
 
     B1 = D2 - C0 * front_vel / (2 * p.S)
     A1 = D2 + C0 * front_vel / (2 * p.S)
@@ -136,38 +136,29 @@ end
 
 
 span = range(interval_start, interval_end, length=Int(NUM-2))
-lines(
-    span, 
-    u,
-    label="u", 
-    style=:solid,
-    color=:red,
-    linewidth=1,
+
+plot(
+    span, u, 
+    xlims=(-0.1, 0.1),
+    label="u computed"
 )
-lines!(
-    span, 
-    x -> u_composite(x, params),
-    label="u asymptotic", 
-    style=:solid,
-    linewidth=1,
+plot!(
+    span, x -> u_composite(x, params),
+    label="u approx"
 )
-lines(
+
+plot(
     span, 
-    v, #log10.(abs.(v)),
-    label="v",# log10(|v|)", 
-    style=:solid,
-    color=:blue,
-    linewidth=1,
+    v,
+    #yaxis=:log,
+    xlims=(-0.1, 0.1),
+    label="v computed"
 )
-lines!(
-    span, 
+plot!(
+    span,
     x -> v_composite(x, params),
-    label="v asymptotic", 
-    style=:solid,
-    linewidth=1,
+    label="v approx"
 )
-axislegend()
-current_figure()
 
 #=
 x = Fun(interval_start..interval_end)

@@ -1,5 +1,5 @@
 using Printf
-#using Plots
+using Plots
 using FastGaussQuadrature
 using ClassicalOrthogonalPolynomials
 using LinearAlgebra
