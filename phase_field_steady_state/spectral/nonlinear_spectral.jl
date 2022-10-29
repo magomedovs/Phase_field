@@ -48,8 +48,8 @@ function calculate_spectral(NUM::Int64, p::Params; save_solution=false, output_f
 
     #f!(F, x) = f!(F, x, p)
 
-    phi_init_coefs = calculate_cheb_colloc_expansion_coeffs(x -> phi_approx((α * atanh(x)), p), NUM; dist_from_boundary=1e-13)
-    T_init_coefs = calculate_cheb_colloc_expansion_coeffs(x -> T_approx((α * atanh(x)), p), NUM; dist_from_boundary=1e-13)
+    phi_init_coefs = calculate_cheb_expansion_coeffs(x -> phi_approx((α * atanh(x)), p), NUM; dist_from_boundary=1e-13)
+    T_init_coefs = calculate_cheb_expansion_coeffs(x -> T_approx((α * atanh(x)), p), NUM; dist_from_boundary=1e-13)
 
     if isnan(T_init_coefs[1]) || isnan(T_init_coefs[end]) || isnan(phi_init_coefs[1]) || isnan(phi_init_coefs[end])
         println("Initial guess values contain NaN!")
@@ -77,11 +77,11 @@ end
 
 params = Params(1.2, 0.005)
 
-const alpha_coef = 2.3
+const alpha_coef = 4.0
 const α = alpha_coef / params.c_sharp_lim   # find appropriate / optimal value !
 println("α = $(α)")
 
-NUM = 200      # must be an even number!
+NUM = 300      # must be an even number!
 #for NUM in [100] #[range(10, 50, step=4); range(60, 100, step=10); range(150, 1100, step=50)]
     phi_expansion_coeffs, T_expansion_coeffs, c_computed = calculate_spectral(NUM, params; save_solution=false)
 #end
@@ -109,8 +109,23 @@ function plot_solution()
         #legend=:bottomleft
     )
 end
+function plot_coeffs()
+    scatter(
+        abs.(phi_expansion_coeffs),
+        label="phi_expansion_coeffs",
+        yaxis=:log,
+        shape=:circle
+    )
+    scatter!(
+        abs.(T_expansion_coeffs),
+        label="T_expansion_coeffs",
+        yaxis=:log,
+        shape=:circle
+    )
+end
 
-#plot_solution()
+plot_solution()
+plot_coeffs()
 
 #=
 plot!(

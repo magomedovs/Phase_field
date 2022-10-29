@@ -19,18 +19,14 @@ function chebyshev_expansion(a_i::Vector{Float64}, x::Float64)::Float64
 end
 
 #cheb_nodes = [cos(pi/num_of_nodes * (1/2 + k)) for k=0:num_of_nodes-1]
-function calculate_cheb_colloc_expansion_coeffs(test_function::Function, N; dist_from_boundary=0.)
-    nodes, _ = gausschebyshev(N-2)
-
-    f_rhs::Vector{Float64} = [[test_function(nodes[i]) for i in eachindex(nodes)]; test_function(-1+dist_from_boundary); test_function(1-dist_from_boundary)]
-
-    A::Matrix{Float64} = Matrix{Float64}(undef, N::Int64, N::Int64)
-    for i in eachindex(nodes)
-        A[i, :] = [chebyshevt(k, nodes[i]) for k=0:N-1]
-    end
-    A[N-1, :] = [chebyshevt(k, -1) for k=0:N-1]
-    A[N, :] = [chebyshevt(k, 1) for k=0:N-1]
-
+function calculate_cheb_expansion_coeffs(test_function::Function, N; dist_from_boundary=0.)
+    cheb_nodes, _ = gausschebyshev(N-2)
+    nodes = [-1 + dist_from_boundary; cheb_nodes; 1 - dist_from_boundary]
+    
+    chebT = ChebyshevT()
+    A::Matrix{Float64} = chebT[nodes, 1:N]
+    f_rhs::Vector{Float64} = [test_function(-1 + dist_from_boundary); [test_function(cheb_nodes[i]) for i in eachindex(cheb_nodes)]; test_function(1 - dist_from_boundary)]
+    
     a_i::Vector{Float64} = A \ f_rhs
 
     return a_i

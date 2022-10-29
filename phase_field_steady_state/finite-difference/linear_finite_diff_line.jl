@@ -82,7 +82,7 @@ function solve_eigen(phi, T, p::Params, k::Float64, NUM::Int64;
 
 end
 
-file_name = "phase_field_steady_state/finite-difference/spectral_tests_data/spectral_solution_coeffs_NUM_700.txt"
+file_name = "phase_field_steady_state/finite-difference/spectral_tests_data_alpha_coef_2.3/spectral_solution_coeffs_NUM_700.txt"
 phi, T, c_computed = read_solution_from_file(file_name)
 
 phi_computed(x::Float64)::Float64 = chebyshev_expansion(phi, x)
@@ -139,7 +139,7 @@ span = range(interval_start, interval_end, length=Int(NUM-2))
 
 plot(
     span, u, 
-    xlims=(-0.1, 0.1),
+    #xlims=(-0.1, 0.1),
     label="u computed"
 )
 plot!(
@@ -151,7 +151,7 @@ plot(
     span, 
     v,
     #yaxis=:log,
-    xlims=(-0.1, 0.1),
+    #xlims=(-0.1, 0.1),
     label="v computed"
 )
 plot!(
@@ -159,6 +159,44 @@ plot!(
     x -> v_composite(x, params),
     label="v approx"
 )
+
+#=
+tempspan = range(-0.3, 0.3, length=Int(1e3))
+plot(
+    tempspan,
+    x -> u_composite(x, params),
+    label="u approx",
+    xlabel="η"
+)
+plot!(
+    tempspan,
+    x -> v_composite(x, params),
+    label="v approx",
+    #yaxis=:log,
+    legend=:topleft,
+    xlabel="η"
+)
+#savefig("~/Desktop/uv_approx.pdf")
+
+tempspan1 = range(-1., 1., length=Int(1e3))
+temp_alpha = α
+plot(
+    tempspan1,
+    x -> phi_approx(temp_alpha * atanh(x), params),
+    label="phi",
+    title="α=$(round(temp_alpha, digits=3))",
+    xlabel="x"
+)
+plot!(
+    tempspan1,
+    x -> T_approx(temp_alpha * atanh(x), params),
+    label="T",
+    #yaxis=:log,
+    legend=:topleft,
+    xlabel="x"
+)
+#savefig("~/Desktop/phiT_approx_alpha_$(round(temp_alpha, digits=3)).pdf")
+=#
 
 #=
 x = Fun(interval_start..interval_end)

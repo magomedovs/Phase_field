@@ -54,7 +54,7 @@ function chebyshev_expansion(a_i, x)
 end
 
 #cheb_nodes = [cos(pi/num_of_nodes * (1/2 + k)) for k=0:num_of_nodes-1]
-function calculate_cheb_colloc_expansion_coeffs(test_function::Function, N; dist_from_boundary=0.)
+function calculate_cheb_expansion_coeffs(test_function::Function, N; dist_from_boundary=0.)
     nodes, _ = gausschebyshev(N-2)
 
     f_rhs::Vector{Float64} = [[test_function(nodes[i]) for i in eachindex(nodes)]; test_function(-1+dist_from_boundary); test_function(1-dist_from_boundary)]
@@ -125,9 +125,9 @@ function f!(F, x)
     end
 end
 
-#phi_init_coefs = calculate_cheb_colloc_expansion_coeffs(x -> phi_init_band((α * atanh(x))), NUM)
+#phi_init_coefs = calculate_cheb_expansion_coeffs(x -> phi_init_band((α * atanh(x))), NUM)
 psi_init_coefs = fill(0., NUM)
-T_init_coefs = calculate_cheb_colloc_expansion_coeffs(x -> T_composite_solution((α * atanh(x))), NUM; dist_from_boundary=1e-13)
+T_init_coefs = calculate_cheb_expansion_coeffs(x -> T_composite_solution((α * atanh(x))), NUM; dist_from_boundary=1e-13)
 
 if isnan(T_init_coefs[1]) || isnan(psi_init_coefs[1])
     println("Initial guess values contain NaN!")
