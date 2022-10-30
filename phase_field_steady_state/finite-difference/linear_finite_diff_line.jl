@@ -15,7 +15,8 @@ include("../spectral/Cheb_expansion.jl")
 
 function solve_eigen(phi, T, p::Params, k::Float64, NUM::Int64;
     c::Float64 = p.c_sharp_lim, 
-    interval_start::Float64 = -3.2, interval_end::Float64 = 3.2)
+    interval_start::Float64 = -3.2, interval_end::Float64 = 3.2,
+    save_solution=false)
 
     #NUM = 501
     h::Float64 = (interval_end - interval_start) / (NUM - 1)
@@ -68,7 +69,7 @@ function solve_eigen(phi, T, p::Params, k::Float64, NUM::Int64;
     println("NUM = ", NUM)
     println("k = ", k)
 
-    number_of_eigenvals = 200
+    number_of_eigenvals = 650
     println("number_of_eigenvals = ", number_of_eigenvals)
 
     # Computing eigenvalues of the matrix Mat
@@ -76,38 +77,55 @@ function solve_eigen(phi, T, p::Params, k::Float64, NUM::Int64;
     # ArnoldiMethod
     decomp, history = @time partialschur(Mat, nev=number_of_eigenvals, tol=1e-10, which=LR());
     λs, X = partialeigen(decomp)
-    println("max Re(λs) = ", findmax(map(x->x.re, λs))[1])
+    λs_max_re, λs_max_re_ind = findmax(map(x->x.re, λs)) #findmax(map(x->x.re, λs))[1], findmax(map(x->x.re, λs))[2]
+    println("max Re(λs) = ", λs_max_re)
+
+    if save_solution
+        λs_max_re = λs_max_re
+        u = Real.(X[1:NUM-2, λs_max_re_ind])
+        v = Real.(X[NUM-1:2*(NUM-2), λs_max_re_ind])
+
+        open("lambdas_k_$(k)_NUM_$(NUM)", "w") do io
+            writedlm(io, λs)
+        end
+        open("uvlambdamax_k_$(k)_NUM_$(NUM)", "w") do io
+            writedlm(io, [u v fill(λs_max_re, length(u))])
+        end
+    end
 
     return λs, X  #, A, B, C, D
 
 end
 
-file_name = "phase_field_steady_state/finite-difference/spectral_tests_data_alpha_coef_2.3/spectral_solution_coeffs_NUM_700.txt"
+file_name = "phase_field_steady_state/finite-difference/spectral_tests_data_alpha_coef_5.0/spectral_solution_coeffs_NUM_600.txt"
 phi, T, c_computed = read_solution_from_file(file_name)
 
 phi_computed(x::Float64)::Float64 = chebyshev_expansion(phi, x)
 T_computed(x::Float64)::Float64 = chebyshev_expansion(T, x)
 
 params = Params(1.2, 0.005)
-const alpha_coef = 2.3
+const alpha_coef = 5.0
 const α = alpha_coef / params.c_sharp_lim   # find appropriate / optimal value !
 
 phi_computed_on_line(eta::Float64)::Float64 = phi_computed(tanh(eta/α))
 T_computed_on_line(eta::Float64)::Float64 = T_computed(tanh(eta/α))
 
 
-interval_start = -5.0
-interval_end = 2.2
+interval_start = -12.0
+interval_end = 2.0
 
-NUM = 10001
-k_test = 15. #1.0e1
-λs_test, X_test = solve_eigen(
-    phi_computed_on_line, T_computed_on_line, params, k_test, NUM;
-    c = c_computed, interval_start = interval_start, interval_end = interval_end
-)
+NUM = 56001
+#k_test = 1.3 #1.0e1
+for k_test in [range(0.5, 0.9, step=0.1); range(1., 19., step=1); range(20., 100., step=10)]
+    λs_test, X_test = solve_eigen(
+        phi_computed_on_line, T_computed_on_line, params, k_test, NUM;
+        c = c_computed, interval_start = interval_start, interval_end = interval_end,
+        save_solution=true
+    )
+end
 
 #@profview 
-
+#=
 u = Real.(X_test[1:NUM-2, findmax(map(x->x.re, λs_test))[2]])
 v = Real.(X_test[NUM-1:2*(NUM-2), findmax(map(x->x.re, λs_test))[2]])
 #plot(range(-H/2, H/2, length = NUM-2), [u, v], label=["u" "v"], xlabel="η", title="k=$k_test")
@@ -159,6 +177,15 @@ plot!(
     x -> v_composite(x, params),
     label="v approx"
 )
+
+plot(
+    span, 
+    abs.(v),
+    yaxis=:log,
+    #xlims=(0., 2.),
+    label="v computed"
+)
+=#
 
 #=
 tempspan = range(-0.3, 0.3, length=Int(1e3))
