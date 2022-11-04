@@ -1,7 +1,7 @@
 using Printf
 using Plots
 #using CairoMakie
-using ApproxFun
+#using ApproxFun
 using LinearAlgebra
 using LsqFit
 using DelimitedFiles
@@ -85,10 +85,10 @@ function solve_eigen(phi, T, p::Params, k::Float64, NUM::Int64;
         u = Real.(X[1:NUM-2, λs_max_re_ind])
         v = Real.(X[NUM-1:2*(NUM-2), λs_max_re_ind])
 
-        open("lambdas_k_$(k)_NUM_$(NUM)", "w") do io
+        open("lambdas_k_$(k)_NUM_$(NUM).txt", "w") do io
             writedlm(io, λs)
         end
-        open("uvlambdamax_k_$(k)_NUM_$(NUM)", "w") do io
+        open("uvlambdamax_k_$(k)_NUM_$(NUM).txt", "w") do io
             writedlm(io, [u v fill(λs_max_re, length(u))])
         end
     end
@@ -114,7 +114,7 @@ T_computed_on_line(eta::Float64)::Float64 = T_computed(tanh(eta/α))
 interval_start = -12.0
 interval_end = 2.0
 
-NUM = 56001
+NUM = 28001
 #k_test = 1.3 #1.0e1
 for k_test in [range(0.5, 0.9, step=0.1); range(1., 19., step=1); range(20., 100., step=10)]
     λs_test, X_test = solve_eigen(

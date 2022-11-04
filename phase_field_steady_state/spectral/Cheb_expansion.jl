@@ -22,10 +22,11 @@ end
 function calculate_cheb_expansion_coeffs(test_function::Function, N; dist_from_boundary=0.)
     cheb_nodes, _ = gausschebyshev(N-2)
     nodes = [-1 + dist_from_boundary; cheb_nodes; 1 - dist_from_boundary]
-    
+    #nodes = [-cos(j * pi / (N-1)) for j=0:(N-1)]
+
     chebT = ChebyshevT()
-    A::Matrix{Float64} = chebT[nodes, 1:N]
-    f_rhs::Vector{Float64} = [test_function(-1 + dist_from_boundary); [test_function(cheb_nodes[i]) for i in eachindex(cheb_nodes)]; test_function(1 - dist_from_boundary)]
+    A::Matrix{Float64} = chebT[nodes, 1:N]  #println("A size = ", size(A))
+    f_rhs::Vector{Float64} = [test_function(node) for node in nodes]    #println("f_rhs size = ", size(f_rhs))
     
     a_i::Vector{Float64} = A \ f_rhs
 

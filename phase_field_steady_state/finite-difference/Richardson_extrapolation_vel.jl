@@ -22,7 +22,7 @@ end
 
 # Uploading data
 computed_arr = []
-for line in eachline("/Users/shamilmagomedov/Desktop/finite_diff_calculated_c.txt")
+for line in eachline("phase_field_steady_state/finite-difference/finite_diff_calculated_c.txt")
     append!(computed_arr, [map(x -> parse(Float64, x), split(line, " "))])
 end
 
@@ -91,7 +91,7 @@ plot!(
     label="$(round(h2_coef, digits=10)) / c_ext * h^2"
 )
 
-#savefig("/Users/shamilmagomedov/Desktop/c_plot_S_" * "$S" * "_eps_" * "$ϵ_0" * ".pdf")
+#savefig("/Users/shamilmagomedov/Desktop/c_finite_diff_plot.pdf")
 
 #cov = estimate_covar(fit)
 #se = stderror(fit)
