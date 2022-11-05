@@ -9,13 +9,23 @@ using DelimitedFiles
 include("Cheb_expansion.jl")
 include("../structs_and_functions.jl")
 
-function calculate_spectral(NUM::Int64, p::Params; save_solution=false, output_filename="spectral_solution_coeffs_NUM_$(NUM).txt")
+function calculate_spectral(
+    NUM::Int64, p::Params; 
+    save_solution=false, 
+    output_filename="spectral_solution_coeffs_NUM_$(NUM).txt",
+    Nodes_kind=:second #:first_pm_one
+    )
 
     println("Number of terms = $(NUM)")
 
-    function f!(F, x)#, p::Params)
-
+    nodes::Vector{Float64} = Vector{Float64}(undef, NUM-2)
+    if Nodes_kind==:first_pm_one
         nodes, _ = gausschebyshev(NUM - 2)
+    elseif Nodes_kind==:second
+        nodes = [cos(j * pi / (NUM-1)) for j=((NUM-1)-1):-1:1] # -1 and 1 are excluded
+    end
+
+    function f!(F, x)#, p::Params)
 
         F[1:5] = [
             # B.C. for ϕ
@@ -27,7 +37,7 @@ function calculate_spectral(NUM::Int64, p::Params; save_solution=false, output_f
             x[NUM+1 : 2*NUM]' * [chebyshevt(k, -1) for k=0:NUM-1] - 1/p.S,
             x[NUM+1 : 2*NUM]' * [chebyshevt(k, 1) for k=0:NUM-1],
         ]
-
+       
         # equations for ϕ
         Threads.@threads for i=1 : NUM-2
             F[5 + i] = -p.ϵ_0^2 * (1 - nodes[i]^2) * (x[1 : NUM]' * [k * ((k+1) * chebyshevt(k, nodes[i]) - chebyshevu(k, nodes[i])) for k=0:NUM-1]) +
@@ -48,8 +58,16 @@ function calculate_spectral(NUM::Int64, p::Params; save_solution=false, output_f
 
     #f!(F, x) = f!(F, x, p)
 
-    phi_init_coefs = calculate_cheb_expansion_coeffs(x -> phi_approx((α * atanh(x)), p), NUM; dist_from_boundary=1e-13)
-    T_init_coefs = calculate_cheb_expansion_coeffs(x -> T_approx((α * atanh(x)), p), NUM; dist_from_boundary=1e-13)
+    phi_init_coefs = calculate_cheb_expansion_coeffs(
+        x -> phi_approx((α * atanh(x)), p), NUM; 
+        dist_from_boundary=1e-13,
+        nodes_kind=Nodes_kind
+        )
+    T_init_coefs = calculate_cheb_expansion_coeffs(
+        x -> T_approx((α * atanh(x)), p), NUM; 
+        dist_from_boundary=1e-13,
+        nodes_kind=Nodes_kind
+        )
 
     if isnan(T_init_coefs[1]) || isnan(T_init_coefs[end]) || isnan(phi_init_coefs[1]) || isnan(phi_init_coefs[end])
         println("Initial guess values contain NaN!")
@@ -77,13 +95,17 @@ end
 
 params = Params(1.2, 0.005)
 
-const alpha_coef = 4.0
+const alpha_coef = 5.0
 const α = alpha_coef / params.c_sharp_lim   # find appropriate / optimal value !
 println("α = $(α)")
 
 NUM = 300      # must be an even number!
 #for NUM in [100] #[range(10, 50, step=4); range(60, 100, step=10); range(150, 1100, step=50)]
-    phi_expansion_coeffs, T_expansion_coeffs, c_computed = calculate_spectral(NUM, params; save_solution=false)
+    phi_expansion_coeffs, T_expansion_coeffs, c_computed = calculate_spectral(
+        NUM, params; 
+        save_solution=false, 
+        Nodes_kind=:second #:first_pm_one #:second
+    )
 #end
 
 #phi_expansion_coeffs, T_expansion_coeffs, c_computed = read_solution_from_file("spectral_solution_coeffs_NUM_$(NUM).txt")

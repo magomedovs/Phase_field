@@ -18,11 +18,25 @@ function chebyshev_expansion(a_i::Vector{Float64}, x::Float64)::Float64
     =#
 end
 
-#cheb_nodes = [cos(pi/num_of_nodes * (1/2 + k)) for k=0:num_of_nodes-1]
-function calculate_cheb_expansion_coeffs(test_function::Function, N; dist_from_boundary=0.)
-    cheb_nodes, _ = gausschebyshev(N-2)
-    nodes = [-1 + dist_from_boundary; cheb_nodes; 1 - dist_from_boundary]
-    #nodes = [-cos(j * pi / (N-1)) for j=0:(N-1)]
+function calculate_cheb_expansion_coeffs(
+    test_function::Function, N; 
+    dist_from_boundary=0., 
+    nodes_kind=:second #:first_pm_one
+    )
+
+    nodes::Vector{Float64} = Vector{Float64}(undef, N)
+
+    if nodes_kind==:first_pm_one
+        cheb_nodes, _ = gausschebyshev(N-2)     # [cos(pi * (1/2 + k)/num_of_nodes) for k=0:num_of_nodes-1]
+        nodes = [-1 + dist_from_boundary; cheb_nodes; 1 - dist_from_boundary]
+    elseif nodes_kind==:second
+        nodes = [cos(j * pi / (N-1)) for j=(N-1):-1:0]
+        nodes[1] += dist_from_boundary
+        nodes[end] -= dist_from_boundary
+    else
+        println("Nodes kind is not chosen correctly!")
+        return fill(0., N)
+    end
 
     chebT = ChebyshevT()
     A::Matrix{Float64} = chebT[nodes, 1:N]  #println("A size = ", size(A))
