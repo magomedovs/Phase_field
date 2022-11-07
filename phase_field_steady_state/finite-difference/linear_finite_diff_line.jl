@@ -16,6 +16,7 @@ include("../spectral/Cheb_expansion.jl")
 function solve_eigen(phi, T, p::Params, k::Float64, NUM::Int64;
     c::Float64 = p.c_sharp_lim, 
     interval_start::Float64 = -3.2, interval_end::Float64 = 3.2,
+    number_of_eigenvals::Int64 = 200,
     save_solution=false)
 
     #NUM = 501
@@ -69,7 +70,6 @@ function solve_eigen(phi, T, p::Params, k::Float64, NUM::Int64;
     println("NUM = ", NUM)
     println("k = ", k)
 
-    number_of_eigenvals = 650
     println("number_of_eigenvals = ", number_of_eigenvals)
 
     # Computing eigenvalues of the matrix Mat
@@ -97,15 +97,27 @@ function solve_eigen(phi, T, p::Params, k::Float64, NUM::Int64;
 
 end
 
-file_name = "phase_field_steady_state/finite-difference/spectral_tests_data_alpha_coef_5.0/spectral_solution_coeffs_NUM_600.txt"
-phi, T, c_computed = read_solution_from_file(file_name)
-
-phi_computed(x::Float64)::Float64 = chebyshev_expansion(phi, x)
-T_computed(x::Float64)::Float64 = chebyshev_expansion(T, x)
-
-params = Params(1.2, 0.005)
+epsilon_0 = 0.01
+params = Params(1.2, epsilon_0)
 const alpha_coef = 5.0
 const α = alpha_coef / params.c_sharp_lim   # find appropriate / optimal value !
+
+file_name = ""
+dir_path = "phase_field_steady_state/finite-difference/phi_T_spectral_coeffs/"
+if epsilon_0 == 0.01
+    file_name = dir_path * "phi_T_spectral_coeffs_eps_01_NUM_300.txt"
+elseif epsilon_0 == 0.005
+    file_name = dir_path * "phi_T_spectral_coeffs_eps_005_NUM_600.txt"
+elseif epsilon_0 == 0.0025
+    file_name = dir_path * "phi_T_spectral_coeffs_eps_0025_NUM_1100.txt"
+else
+    println("File with spectral coefficients is not found!")
+end
+
+phi_coeffs, T_coeffs, c_computed = read_solution_from_file(file_name)
+
+phi_computed(x::Float64)::Float64 = chebyshev_expansion(phi_coeffs, x)
+T_computed(x::Float64)::Float64 = chebyshev_expansion(T_coeffs, x)
 
 phi_computed_on_line(eta::Float64)::Float64 = phi_computed(tanh(eta/α))
 T_computed_on_line(eta::Float64)::Float64 = T_computed(tanh(eta/α))
@@ -114,12 +126,13 @@ T_computed_on_line(eta::Float64)::Float64 = T_computed(tanh(eta/α))
 interval_start = -12.0
 interval_end = 2.0
 
-NUM = 28001
-#k_test = 1.3 #1.0e1
-for k_test in [range(0.5, 0.9, step=0.1); range(1., 19., step=1); range(20., 100., step=10)]
+NUM = 14000
+#k_test = 0.5 #1.0e1
+for k_test in [range(0.5, 0.9, step=0.1); range(1., 19., step=1); range(20., 30., step=5)]
     λs_test, X_test = solve_eigen(
         phi_computed_on_line, T_computed_on_line, params, k_test, NUM;
         c = c_computed, interval_start = interval_start, interval_end = interval_end,
+        number_of_eigenvals = trunc(Int, NUM/100),
         save_solution=true
     )
 end
