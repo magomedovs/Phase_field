@@ -1,10 +1,10 @@
 using Printf
 using Plots
-using FastGaussQuadrature
 using ClassicalOrthogonalPolynomials
 using LinearAlgebra
 using NLsolve
 using DelimitedFiles
+using LaTeXStrings
 
 include("Cheb_expansion.jl")
 include("../structs_and_functions.jl")
@@ -12,62 +12,60 @@ include("../structs_and_functions.jl")
 function calculate_spectral(
     NUM::Int64, p::Params; 
     save_solution=false, 
-    output_filename="spectral_solution_coeffs_NUM_$(NUM).txt",
-    Nodes_kind=:second #:first_pm_one
-    )
-
+    output_filename="spectral_solution_coeffs_NUM_$(NUM).txt")
     println("Number of terms = $(NUM)")
 
-    nodes::Vector{Float64} = Vector{Float64}(undef, NUM-2)
-    if Nodes_kind==:first_pm_one
-        nodes, _ = gausschebyshev(NUM - 2)
-    elseif Nodes_kind==:second
-        nodes = [cos(j * pi / (NUM-1)) for j=((NUM-1)-1):-1:1] # -1 and 1 are excluded
-    end
+    nodes = [cos(j * pi / (NUM-1)) for j=(NUM-1):-1:0]
 
-    function f!(F, x)#, p::Params)
+    function f!(F, a)#, p::Params)
 
-        F[1:5] = [
-            # B.C. for ϕ
-            x[1 : NUM]' * [chebyshevt(k, -1) for k=0:NUM-1],
-            x[1 : NUM]' * [chebyshevt(k, 1) for k=0:NUM-1] - 1,
-            x[1 : NUM]' * [chebyshevt(k, 0) for k=0:NUM-1] - 1/2,
-            
-            # B.C. for T
-            x[NUM+1 : 2*NUM]' * [chebyshevt(k, -1) for k=0:NUM-1] - 1/p.S,
-            x[NUM+1 : 2*NUM]' * [chebyshevt(k, 1) for k=0:NUM-1],
-        ]
-       
-        # equations for ϕ
-        Threads.@threads for i=1 : NUM-2
-            F[5 + i] = -p.ϵ_0^2 * (1 - nodes[i]^2) * (x[1 : NUM]' * [k * ((k+1) * chebyshevt(k, nodes[i]) - chebyshevu(k, nodes[i])) for k=0:NUM-1]) +
-                        #1/α^2 * (1 - nodes[i]^2) * (α * p.τ * x[2*NUM + 1] - 2 * p.ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
-                        (1 - nodes[i]^2) * (α * p.τ * x[2*NUM + 1] - 2 * p.ϵ_0^2 * nodes[i]) * (x[1 : NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
-                        α^2 * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) * (1 - x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) *
-                        (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1] - 1/2 - m(x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1], p))
+        chebT = chebyshevt()
+        phi_expansion(x) = a[1 : NUM]' * chebT[x, 1:NUM]
+        T_expansion(x)   = a[NUM+1 : 2*NUM]' * chebT[x, 1:NUM]
+        
+        # chebU = chebyshevu()
+        dphi_expansion(x)               = a[1 : NUM]' * [0; [k * chebyshevu(k-1, x) for k=1:NUM-1]]
+        ddphi_expansion_numerator(x)    = a[1 : NUM]' * [k * ((k+1) * chebyshevt(k, x) - chebyshevu(k, x)) for k=0:NUM-1]
+        dT_expansion(x)                 = a[NUM+1 : 2*NUM]' * [0; [k * chebyshevu(k-1, x) for k=1:NUM-1]]
+
+        wave_speed = a[2*NUM + 1]
+
+        Threads.@threads for i=1 : NUM
+            x = nodes[i]
+            # equations for ϕ
+            F[i] = -p.ϵ_0^2 * (1 - x^2) * ddphi_expansion_numerator(x) +
+                    (1 - x^2) * (α * p.τ * wave_speed - 2 * p.ϵ_0^2 * x) * dphi_expansion(x) +
+                    α^2 * phi_expansion(x) * (1 - phi_expansion(x)) *
+                    (phi_expansion(x) - 1/2 - m(T_expansion(x), p))
+
+            # equations for T
+            F[NUM + i] = (1 - x^2) * dT_expansion(x) +
+                    α * wave_speed * T_expansion(x) +
+                    α * wave_speed / p.S * phi_expansion(x) - 
+                    α * wave_speed / p.S 
         end
 
-        # equations for T
-        Threads.@threads for i=1 : NUM-2
-            F[5 + NUM-2 + i] = (1 - nodes[i]^2) * (x[NUM+1 : 2*NUM]' * [0; [k * chebyshevu(k-1, nodes[i]) for k=1:NUM-1]]) +
-                                α * x[2*NUM + 1] * (x[NUM+1 : 2*NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) +
-                                α * x[2*NUM + 1] / p.S * (x[1 : NUM]' * [chebyshevt(k, nodes[i]) for k=0:NUM-1]) - 
-                                α * x[2*NUM + 1] / p.S 
-        end
+        # Modify some equations to account for the boundary conditions
+        # B.C. for ϕ
+        F[1]    = phi_expansion(nodes[1]) - 0           # at x = -1
+        F[NUM]  = phi_expansion(nodes[NUM]) - 1         # at x = 1
+        # B.C. for T
+        # F[NUM + 1] = T_expansion(nodes[1]) - 1/p.S      # at x = -1. This third condition seems excessive.
+        F[2*NUM] = T_expansion(nodes[NUM]) - 0.         # at x = 1
+
+        # Additional equation needed to close the system (because of the unknown wave_speed).
+        F[2*NUM + 1] = phi_expansion(0) - 1/2           # at x = 0
+        
     end
 
     #f!(F, x) = f!(F, x, p)
 
     phi_init_coefs = calculate_cheb_expansion_coeffs(
         x -> phi_approx((α * atanh(x)), p), NUM; 
-        dist_from_boundary=1e-13,
-        nodes_kind=Nodes_kind
-        )
+        dist_from_boundary=1e-13)
     T_init_coefs = calculate_cheb_expansion_coeffs(
         x -> T_approx((α * atanh(x)), p), NUM; 
-        dist_from_boundary=1e-13,
-        nodes_kind=Nodes_kind
-        )
+        dist_from_boundary=1e-13)
 
     if isnan(T_init_coefs[1]) || isnan(T_init_coefs[end]) || isnan(phi_init_coefs[1]) || isnan(phi_init_coefs[end])
         println("Initial guess values contain NaN!")
@@ -103,9 +101,7 @@ NUM = 300      # must be an even number!
 #for NUM in [100] #[range(10, 50, step=4); range(60, 100, step=10); range(150, 1100, step=50)]
     phi_expansion_coeffs, T_expansion_coeffs, c_computed = calculate_spectral(
         NUM, params; 
-        save_solution=false, 
-        Nodes_kind=:second #:first_pm_one #:second
-    )
+        save_solution=false)
 #end
 
 #phi_expansion_coeffs, T_expansion_coeffs, c_computed = read_solution_from_file("spectral_solution_coeffs_NUM_$(NUM).txt")
@@ -120,14 +116,14 @@ function plot_solution()
         x, x -> phi_computed(x),# xlims=(1-1e-5, 1), ylims=(0, 1e-6),
         #ylabel="f(x)",
         xlabel="x",
-        label="phi(x)",
+        label=L"\phi(x)",
         #legend=:bottomleft
     )
     plot!(
         x, x -> T_computed(x), 
         #ylabel="f(x)",
-        xlabel="x",
-        label="T(x)",
+        xlabel=L"x",
+        label=L"T(x)",
         #legend=:bottomleft
     )
 end
